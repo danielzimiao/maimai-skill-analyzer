@@ -9,16 +9,29 @@ export interface AnalysisResult {
   }>
 }
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
 export async function analyzeChart(file: File): Promise<AnalysisResult> {
-  // implemented in step 8
-  void file
-  throw new Error('Not implemented yet')
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const response = await fetch(`${API_URL}/analyze`, {
+    method: 'POST',
+    body: formData,
+  })
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}))
+    throw new Error(err.error || err.detail || `Server error: ${response.status}`)
+  }
+
+  return response.json()
 }
 
 export async function getTags(
   tag: string,
 ): Promise<{ tag: string; songs: AnalysisResult['similar_songs'] }> {
-  // implemented in step 10
-  void tag
-  throw new Error('Not implemented yet')
+  const response = await fetch(`${API_URL}/tags/${encodeURIComponent(tag)}`)
+  if (!response.ok) throw new Error(`Server error: ${response.status}`)
+  return response.json()
 }

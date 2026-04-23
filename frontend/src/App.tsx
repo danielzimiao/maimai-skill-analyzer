@@ -1,18 +1,9 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { UploadZone } from './components/UploadZone'
+import { analyzeChart, type AnalysisResult } from './api'
 
 type AppState = 'idle' | 'analyzing' | 'results'
-
-interface AnalysisResult {
-  difficulty: number | null
-  tags: string[]
-  similar_songs: Array<{
-    name: string
-    difficulty: number | null
-    release_date: string | null
-    bg_image_url: string | null
-  }>
-}
 
 function App() {
   const [appState, setAppState] = useState<AppState>('idle')
@@ -24,48 +15,20 @@ function App() {
   void uploadedFile
   void results
   void activeBrowseTag
+  void setActiveBrowseTag
 
-  function handleSimulate() {
-    if (appState === 'idle') setAppState('analyzing')
-    else if (appState === 'analyzing') setAppState('results')
-    else setAppState('idle')
+  const handleFileSelect = async (file: File) => {
+    setUploadedFile(file)
+    setAppState('analyzing')
+    try {
+      const result = await analyzeChart(file)
+      setResults(result)
+      setAppState('results')
+    } catch (err) {
+      console.error('Analysis failed:', err)
+      setAppState('idle')
+    }
   }
-
-  const simulateLabel =
-    appState === 'idle'
-      ? 'Simulate analyzing'
-      : appState === 'analyzing'
-      ? 'Simulate results'
-      : 'Reset'
-
-  const UploadZonePlaceholder = () => (
-    <div className="w-full max-w-md border-2 border-dashed border-gray-700 rounded-2xl p-12 flex flex-col items-center gap-4 text-gray-500">
-      <svg
-        className="w-12 h-12 text-gray-600"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={1.5}
-          d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
-        />
-      </svg>
-      <p className="text-sm text-center">
-        Drop your maimai chart file here
-        <br />
-        <span className="text-xs text-gray-600">or click to browse</span>
-      </p>
-      <button
-        onClick={handleSimulate}
-        className="mt-2 px-4 py-2 rounded-lg bg-purple-700 hover:bg-purple-600 text-white text-sm font-medium transition-colors"
-      >
-        {simulateLabel}
-      </button>
-    </div>
-  )
 
   return (
     <AnimatePresence mode="wait">
@@ -85,7 +48,7 @@ function App() {
             <p className="text-gray-400 text-sm text-center">
               Upload a chart to analyze difficulty and find similar songs
             </p>
-            <UploadZonePlaceholder />
+            <UploadZone onFileSelect={handleFileSelect} />
           </div>
         </motion.div>
       ) : (
@@ -102,9 +65,9 @@ function App() {
             initial={{ x: -40, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ duration: 0.4, delay: 0.1 }}
-            className="w-1/2 flex items-center justify-center border-r border-gray-800"
+            className="w-1/2 flex items-center justify-center border-r border-gray-800 p-8"
           >
-            <UploadZonePlaceholder />
+            <UploadZone onFileSelect={handleFileSelect} />
           </motion.div>
 
           {/* Right panel — analyzing or results */}
