@@ -3,6 +3,8 @@ import argparse
 import shutil
 from pathlib import Path
 import sys
+from PIL import Image
+from tqdm import tqdm
 sys.path.insert(0, str(Path(__file__).parent))
 
 from dotenv import load_dotenv
@@ -35,7 +37,6 @@ def iter_song_dirs(charts_dir: Path):
         if (entry / 'maidata.txt').exists():
             yield entry
         else:
-            # One level deeper (e.g. version folders like "23. BUDDiES PLUS")
             for sub in sorted(entry.iterdir()):
                 if sub.is_dir() and (sub / 'maidata.txt').exists():
                     yield sub
@@ -62,14 +63,16 @@ def main():
         conn.close()
         print("Cleared existing songs.")
 
+    song_dirs = list(iter_song_dirs(charts_dir))
     ok_count = 0
     skip_count = 0
 
-    for song_dir in iter_song_dirs(charts_dir):
+    bar = tqdm(song_dirs, unit="song", ncols=80)
+    for song_dir in bar:
         # Skip 宴会铺面 — folder names start with [kanji]
         if song_dir.name.startswith('['):
-            print(f"[SKIP] {song_dir.name} — 宴会铺面 ignored")
             skip_count += 1
+            bar.set_postfix(ok=ok_count, skip=skip_count)
             continue
 
         maidata = song_dir / 'maidata.txt'
@@ -79,7 +82,6 @@ def main():
             result = rule_analyze(features)
             tags = result.get('tags', ['Balanced'])
             difficulty = result.get('difficulty')
-
             name = extract_title(maidata)
 
             bg_image_url = None
@@ -90,18 +92,24 @@ def main():
             )
             if bg_src is not None:
                 song_id = f"{ok_count + 1:04d}"
-                suffix = bg_src.suffix.lower()
-                dest = covers_dir / f"{song_id}{suffix}"
-                shutil.copy2(bg_src, dest)
-                bg_image_url = f"/static/covers/{song_id}{suffix}"
+                dest = covers_dir / f"{song_id}.jpg"
+                try:
+                    with Image.open(bg_src) as im:
+                        im = im.convert("RGB")
+                        im.thumbnail((256, 256), Image.LANCZOS)
+                        im.save(dest, "JPEG", quality=75, optimize=True)
+                except Exception:
+                    shutil.copy2(bg_src, dest)
+                bg_image_url = f"/static/covers/{song_id}.jpg"
 
             insert_song(name, tags, difficulty, None, bg_image_url)
-            print(f"[OK] {name} — tags: {tags}, difficulty: {difficulty}")
             ok_count += 1
+            bar.set_postfix(ok=ok_count, skip=skip_count, song=name[:20])
 
         except Exception as e:
-            print(f"[SKIP] {song_dir.name} — {e}")
+            tqdm.write(f"[SKIP] {song_dir.name} — {e}")
             skip_count += 1
+            bar.set_postfix(ok=ok_count, skip=skip_count)
 
     print(f"\nDone: {ok_count} songs ingested, {skip_count} skipped.")
 
