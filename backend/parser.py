@@ -19,10 +19,24 @@ MaiConverter API summary (v0.14.5):
 
 from __future__ import annotations
 
+import io
 import re
+import sys
+from contextlib import contextmanager
 from typing import Optional
 
 from maiconverter.simai import parse_file_str
+
+
+@contextmanager
+def _suppress_stdout():
+    """Suppress maiconverter's 'Parsing chart #N...Done' noise."""
+    old = sys.stdout
+    sys.stdout = io.StringIO()
+    try:
+        yield
+    finally:
+        sys.stdout = old
 from maiconverter.simai.simainote import TapNote, HoldNote, SlideNote, TouchHoldNote
 from maiconverter.event import NoteType
 
@@ -203,7 +217,8 @@ def parse(maidata_path: str) -> dict:
 
     try:
         cleaned = _preprocess_simai(raw_simai)
-        _title, charts = parse_file_str(cleaned)
+        with _suppress_stdout():
+            _title, charts = parse_file_str(cleaned)
     except Exception:
         # maiconverter can't handle modern simai notation — use regex fallback.
         return _fallback_parse(raw_simai)
