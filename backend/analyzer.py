@@ -90,12 +90,16 @@ def rule_analyze(features: dict) -> dict:
             seen.add(t)
     tags = ordered[:3] or ["Balanced"]
 
-    # Difficulty: density-driven base + BPM and slide bonuses, rounded to 0.5
-    base = min(density * 1.4, 13.0)
-    bpm_bonus = max(0.0, (bpm - 150.0) / 100.0)
-    slide_bonus = slide_r * 2.0
-    raw = base + bpm_bonus + slide_bonus
-    difficulty = round(min(max(raw, 1.0), 15.0) * 2) / 2
+    # Use in-game level tag if available (lv_5/lv_4 in maidata.txt).
+    if features.get("level") is not None:
+        difficulty = features["level"]
+    else:
+        base = min(density * 1.8 + 2.0, 13.0)
+        bpm_bonus = max(0.0, (bpm - 150.0) / 80.0)
+        note_bonus = min(total / 500.0, 1.5)
+        slide_bonus = slide_r * 1.5
+        raw = base + bpm_bonus + note_bonus + slide_bonus
+        difficulty = round(min(max(raw, 1.0), 15.0) * 2) / 2
 
     return {"tags": tags, "difficulty": difficulty}
 
