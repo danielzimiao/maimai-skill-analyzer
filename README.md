@@ -1,4 +1,4 @@
-# maimai Skill Gap Analyzer
+# maimai Chart Tagger
 
 **[English](#english)** | [中文](#chinese)
 
