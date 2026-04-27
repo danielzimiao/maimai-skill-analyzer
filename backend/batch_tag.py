@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent / ".env")
 
 from parser import parse
-from analyzer import analyze
+from analyzer import rule_analyze
 from database import insert_song, _connect
 
 
@@ -76,7 +76,7 @@ def main():
 
         try:
             features = parse(str(maidata))
-            result = analyze(features)
+            result = rule_analyze(features)
             tags = result.get('tags', ['Balanced'])
             difficulty = result.get('difficulty')
 

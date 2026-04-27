@@ -42,6 +42,64 @@ Return JSON ONLY — no markdown fences, no commentary — in exactly this forma
 # Public API
 # ---------------------------------------------------------------------------
 
+_TAG_PRIORITY = [
+    "Trill", "Slide-Heavy", "Stream", "Stamina",
+    "Tech/Crossover", "Hand-Alternation", "Balanced",
+]
+
+
+def rule_analyze(features: dict) -> dict:
+    """Deterministic, zero-cost tagger used for batch DB population.
+
+    Returns the same shape as analyze() so batch_tag.py needs no other changes.
+    """
+    total = features["total_notes"] or 1
+    tap_r = features["tap_count"] / total
+    hold_r = features["hold_count"] / total
+    slide_r = features["slide_count"] / total
+    dur = features["duration_seconds"] or 1.0
+    density = total / dur          # notes per second
+    bpm = features["bpm"] or 120.0
+
+    tags: list[str] = []
+
+    if slide_r > 0.30:
+        tags.append("Slide-Heavy")
+
+    if bpm >= 170 and tap_r > 0.65 and density > 9:
+        tags.append("Trill")
+
+    if tap_r > 0.60 and density > 6 and "Trill" not in tags:
+        tags.append("Stream")
+
+    if dur > 100 or (density > 5 and total > 700):
+        tags.append("Stamina")
+
+    if slide_r > 0.15 and hold_r > 0.10 and density > 4:
+        tags.append("Tech/Crossover")
+
+    if 0.45 <= tap_r <= 0.72 and slide_r < 0.25 and density > 5:
+        tags.append("Hand-Alternation")
+
+    # Deduplicate, sort by priority, cap at 3
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for t in _TAG_PRIORITY:
+        if t in tags and t not in seen:
+            ordered.append(t)
+            seen.add(t)
+    tags = ordered[:3] or ["Balanced"]
+
+    # Difficulty: density-driven base + BPM and slide bonuses, rounded to 0.5
+    base = min(density * 1.4, 13.0)
+    bpm_bonus = max(0.0, (bpm - 150.0) / 100.0)
+    slide_bonus = slide_r * 2.0
+    raw = base + bpm_bonus + slide_bonus
+    difficulty = round(min(max(raw, 1.0), 15.0) * 2) / 2
+
+    return {"tags": tags, "difficulty": difficulty}
+
+
 def analyze(features: dict) -> dict:
     """Analyze a parsed maimai chart and return skill tags + difficulty.
 
